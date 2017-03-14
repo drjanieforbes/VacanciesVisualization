@@ -1,7 +1,7 @@
 # VacanciesVisualization
 This project seeks to develop a data visualization of vacant residence data from Housing and Urban Development (HUD) data.
 
-An initial attempt to use R to both process and visualize the data has failed (see R script).
+An initial attempt to use R to both process and visualize the data has failed (see PlotVacantVsTotalUnits.R Version 2).
 
 The plan is to use Python to summarize the data, and R to visualize it.
 
