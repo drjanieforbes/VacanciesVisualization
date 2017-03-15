@@ -69,6 +69,7 @@ def main():
                 "year",
                 "AMS_RES",
                 "RES_VAC",
+                "AVG_VAC_R,
                 "VAC_3_RES",
                 "VAC_3_6_R",
                 "VAC_6_12R",
@@ -79,6 +80,7 @@ def main():
     # national level totals
     totalAllAMS_RES = 0
     totalAllRES_VAC = 0
+    totalAllAVG_VAC_R = 0
     totalAllVAC_3_RES = 0
     totalAllVAC_3_6_R = 0
     totalAllVAC_6_12R = 0
@@ -89,6 +91,7 @@ def main():
     # state level totals
     totalStateAMS_RES = 0
     totalStateRES_VAC = 0
+    totalStateAVG_VAC_R = 0
     totalStateVAC_3_RES = 0
     totalStateVAC_3_6_R = 0
     totalStateVAC_6_12R = 0
@@ -99,6 +102,7 @@ def main():
     # county level totals
     totalCountyAMS_RES = 0
     totalCountyRES_VAC = 0
+    totalCountyAVG_VAC_R = 0
     totalCountyVAC_3_RES = 0
     totalCountyVAC_3_6_R = 0
     totalCountyVAC_6_12R = 0
