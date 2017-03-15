@@ -145,7 +145,8 @@ def main():
             # sum the national totals (all records within each quarter/year)
             totalAllAMS_RES += row["AMS_RES"]
             totalAllRES_VAC += row["RES_VAC"]
-            totalAllVAC_3_RES += row["RES_VAC"]
+            totalAllAVG_VAC_R += row["AVG_VAC_R"]
+            totalAllVAC_3_RES += row["VAC_3_RES"]
             totalAllVAC_3_6_R += row["VAC_3_6_R"]
             totalAllVAC_6_12R += row["VAC_6_12R"]
             totalAllVAC_12_24R += row["VAC_12_24R"]
@@ -155,7 +156,8 @@ def main():
             # sum the state totals (all records within a given state)
             totalStateAMS_RES += row["AMS_RES"]
             totalStateRES_VAC += row["RES_VAC"]
-            totalStateVAC_3_RES += row["RES_VAC"]
+            totalStateAVG_VAC_R += row["AVG_VAC_R"]
+            totalStateVAC_3_RES += row["VAC_3_RES"]
             totalStateVAC_3_6_R += row["VAC_3_6_R"]
             totalStateVAC_6_12R += row["VAC_6_12R"]
             totalStateVAC_12_24R += row["VAC_12_24R"]
@@ -165,7 +167,8 @@ def main():
             # sum the county totals (all records within a given state-county)
             totalCountyAMS_RES += row["AMS_RES"]
             totalCountyRES_VAC += row["RES_VAC"]
-            totalCountyVAC_3_RES += row["RES_VAC"]
+            totalCountyAVG_VAC_R += row["AVG_VAC_R"]
+            totalCountyVAC_3_RES += row["VAC_3_RES"]
             totalCountyVAC_3_6_R += row["VAC_3_6_R"]
             totalCountyVAC_6_12R += row["VAC_6_12R"]
             totalCountyVAC_12_24R += row["VAC_12_24R"]
@@ -186,6 +189,7 @@ def main():
                     # reset the county level totals
                     totalCountyAMS_RES = 0
                     totalCountyRES_VAC = 0
+                    totalCountyAVG_VAC_R = 0
                     totalCountyVAC_3_RES = 0
                     totalCountyVAC_3_6_R = 0
                     totalCountyVAC_6_12R = 0
@@ -204,6 +208,7 @@ def main():
                     # reset the state level totals
                     totalStateAMS_RES = 0
                     totalStateRES_VAC = 0
+                    totalStateAVG_VAC_R = 0
                     totalStateVAC_3_RES = 0
                     totalStateVAC_3_6_R = 0
                     totalStateVAC_6_12R = 0
@@ -224,6 +229,7 @@ def main():
         # reset the national totals
         totalAllAMS_RES = 0
         totalAllRES_VAC = 0
+        totalAllAVG_VAC_R = 0
         totalAllVAC_3_RES = 0
         totalAllVAC_3_6_R = 0
         totalAllVAC_6_12R = 0
