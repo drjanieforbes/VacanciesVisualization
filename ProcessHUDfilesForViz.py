@@ -181,6 +181,10 @@ def main():
 
         # use Pysal to open the DBF file
         db = ps.open(myFile)         
+        
+        # note that beginning in 3/2015, HUD headers are NOT uppercase
+        # so make sure that all the column headings are in uppercase to match colsList
+        [x.upper() for x in db.header]    
 
         # create a data dictionary
         data = dict([(var, db.by_col(var)) for var in colsList])
