@@ -25,12 +25,6 @@ library(rio)
 # check to see if working directory has already been set
 # ##################################################################
 
-# version for on site work
-#if(!getwd() == "T:/$$JSL/Janie/Private/VacantHouses") {
-#	oldwd = getwd()
-#	setwd("T:/$$JSL/Janie/Private/VacantHouses")
-#}
-
 # version for telework site (home)
 if(!getwd() == "C:/CensusProjs/HUDData/VacantHouses") {
 	oldwd = getwd()
