@@ -249,6 +249,8 @@ for myFile in fileNames:
         
         numAllRecords += 1
 
+        numTractRecords += 1
+
         # export the record to the census tract file
         tractWriter.writerow([myQtrYear,
                               str(row['GEOID']),
@@ -456,3 +458,4 @@ tractFile.close()
 countyFile.close()
 stateFile.close()
 nationalFile.close()
+
