@@ -61,7 +61,7 @@ This function: reads in DBF files and returns Pandas DF
 Arguments
 ---------
 dbfile  : DBF file - Input to be imported
-upper   : Condition - If true, make column heads upper case
+mycols  : list - List of columns to keep
 '''
 def dbf2DF(dbfile, mycols):
     # Pysal to open DBF file
@@ -226,7 +226,7 @@ for myFile in fileNames:
     else:
         colsList = colsListuc
 
-    # open and convert the .dbf file to pandas data frame
+    # open and convert the .dbf file to pandas data frame with my selected columns
     mypandasDF = dbf2DF(myFile,colsList)
 
     # What's the GEOID look like?
@@ -430,7 +430,7 @@ for myFile in fileNames:
                         totalCountyVAC_24_36R,
                         totalCountyVAC_36_RES])
 
-    # count number of state records processed
+    # count number of county records processed
     numCountyRecords += 1
     
     # reset the county level totals
@@ -456,7 +456,3 @@ tractFile.close()
 countyFile.close()
 stateFile.close()
 nationalFile.close()
-
-
-    
-
