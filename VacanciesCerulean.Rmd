@@ -112,7 +112,7 @@ Column {.tabset}
 # process the national level file
 # ##################################################################
 
-national.data <- read.csv(file="../HUD/mynational.csv", 
+national.data <- read.csv(file="../HUD/national.csv", 
 	header=TRUE, 
 	sep=",")
 
@@ -147,15 +147,21 @@ for (i in 1:nrow(national.data)) {
 			(national.data$totalAllVAC_24_36R[i] / national.data$totalAllRES_VAC[i]),
 			(national.data$totalAllVAC_36_RES[i] / national.data$totalAllRES_VAC[i]),
 			# using a constant!!!!!
-			(sum(national.data$totalAllAVG_VAC_R[i])/NUMTRACTS),
+			#(sum(national.data$totalAllAVG_VAC_R[i])/NUMTRACTS),
+			national.data$totalAllAVG_VAC_R[i],        # already calculated in national.csv
 			(national.data$totalAllRES_VAC[i] / national.data$totalAllAMS_RES[i]),
 			(national.data$totalAllAMS_RES[i]))
 
 	} else {
 		my.vector <- c(my.vector,0,0,0,0,0,0,
-			sum(national.data$totalAllAVG_VAC_R[i])/73767,0,0)	
+			#sum(national.data$totalAllAVG_VAC_R[i])/73767,0,0)
+			national.data$totalAllAVG_VAC_R[i],0,0)	
 	}	
+	
+	# append to my.df
 	my.df[i,] <- my.vector
+	
+	# reset my.vector to empty
 	my.vector = list()
 
 }
