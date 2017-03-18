@@ -11,21 +11,28 @@
 #
 # ##################################################################
 #
-# This script sums individual census tract values at multiple 
-# scales, including county, state, and nation
+# Using R version 3.2.2 (2015-08-14) -- "Fire Safety"
+#
+# This file reads summary files generated from a Python script:
+# 	ProcessHUDfilesForVizWithFn.py
+#
+# The summary files consist of residential vacancy statistics
+# at multiple scales:  national, state, county, and census tract.
+#
+# This script opens and reads each of these files, and generates
+# tables of statistics based on percentages.  Each of the scales
+# is then visualized as a time series of percentage statistics.
 #
 # ##################################################################
 #
 # Modules:
 # 
 # 1)  Checks/sets the working directory
-# 2)  Gets a list of all HUD table file names using "*Data.dbf"
-# 3)  Read and store all the HUD table files as a list of lists
-# 4)  Remove unwanted columns from the HUD table files
-# 5)  Process reformatted data to summarize values at multiple scales
-#
-# These files are all in the form of a census tract equal to a case,
-# with the variables as columns
+# 2)  Opens each of the separate scale summary files:
+#		national.csv
+#		state.csv
+#		county.csv
+#		tract.csv
 #
 # ##################################################################
 
@@ -35,7 +42,7 @@
 # ##################################################################
 
 library(foreign)
-library(tidyverse)
+library(plotly)
 
 # ##################################################################
 # environment settings
@@ -44,484 +51,304 @@ library(tidyverse)
 options(scipen=999)
 
 # ##################################################################
+# constants
+# ##################################################################
+
+NUMTRACTS = 73767
+
+# ##################################################################
 # check to see if working directory has already been set
 # ##################################################################
 
 # version for on site work
+#if(!getwd() == "T:/$$JSL/Janie/Private/VacantHouses") {
+#	oldwd = getwd()
+#	setwd("T:/$$JSL/Janie/Private/VacantHouses")
+#}
 
-# set working directory here
-
-# ##################################################################
-# list all HUD files
-# ##################################################################
-
-filenames <- list.files("Shapefiles",pattern="*Data.dbf",
-		full.names=TRUE)
-
-# ##################################################################
-# check to see if ldf has already been created
-# ##################################################################
-
-# this uploads all available HUD files and stores them in memory
-# for further processing
-
-if (!exists("ldf")) {
-
-	# read and store all the dbf files into a list of lists
-	# each dbf file can be indexed as ldf[[1]] or ldf[[2]], etc.
-	ldf = lapply(filenames, read.dbf, as.is=FALSE)
-
-	# store the descriptive statistics summaries for all the dbf files
-	res <- lapply(ldf, summary)
-
-	# extract file names (ignoring the path)
-	# names(res) <- substr(filenames, 11, 45)	# the start/stop values will chg
+# version for telework site (home)
+if(!getwd() == "C:/CensusProjs/HUDData/VacantHouses") {
+	oldwd = getwd()
+	setwd("C:/CensusProjs/HUDData/VacantHouses")
 }
 
 # ##################################################################
-# pull out all the desired values
+# process the national level file
 # ##################################################################
 
-my.df <- data.frame(matrix(ncol = 11, nrow = 0))
+national.data <- read.csv(file="./HUD/mynational.csv", 
+	header=TRUE, 
+	sep=",")
 
-colnames(my.df) <- c("geoid",
-                     "quarter",
-                     "year",
-                     "ams_res",
-                     "res_vac",
-                     "vac_3_res",
-                     "vac_3_6_res",
-                     "vac_6_12_res",
-                     "vac_12_24_res",
-                     "vac_24_36_res",
-                     "vac_36_res")
+# create empty list
+my.vector = list()
 
-my.geoid <- as.character()
-my.quarter <- as.character()
-my.year <- as.character()
-my.ams_res <- as.integer()
-my.res_vac <- as.integer()
-my.vac_3_res <- as.integer()
-my.vac_3_6_res <- as.integer()
-my.vac_6_12_res <- as.integer()
-my.vac_12_24_res <- as.integer()
-my.vac_24_36_res <- as.integer()
-my.vac_36_res <- as.integer()
+# create empty my.df
+my.df <- data.frame(matrix(ncol = ncol(national.data)-1, 
+	nrow = nrow(national.data)))
 
-for (i in 1:length(ldf)) {
+colnames(my.df) <- c("Month.Year",
+			"VAC_3_RESpc",
+			"VAC_3_6_RESpc",
+			"VAC_6_12_RESpc",
+			"VAC_12_24_RESpc",
+			"VAC_24_36_RESpc",
+			"VAC_36_RESpc",
+			"AVG_DAYS_VAC",
+			"RES_VACpc",
+			"AMS_RES")
 
-	for (j in 1:length(ldf[[i]][,1])) {
-		my.geoid <- c(my.geoid, as.character(ldf[[i]][j,1]))
-		my.quarter <- c(my.quarter, as.character(ldf[[i]][j,70]))
-		my.year <- c(my.year, as.character(ldf[[i]][j,71]))
-		my.ams_res <- c(my.ams_res, ldf[[i]][j,10])
-		my.res_vac <- c(my.res_vac, ldf[[i]][j,13])
-		my.vac_3_res <- c(my.vac_3_res, ldf[[i]][j,19])
-		my.vac_3_6_res <- c(my.vac_3_6_res, ldf[[i]][j,22])
-		my.vac_6_12_res <- c(my.vac_6_12_res, ldf[[i]][j,25])
-		my.vac_12_24_res <- c(my.vac_12_24_res, ldf[[i]][j,28])
-		my.vac_24_36_res <- c(my.vac_24_36_res, ldf[[i]][j,31])
-		my.vac_36_res <- c(my.vac_36_res, ldf[[i]][j,34])
-	}
+for (i in 1:nrow(national.data)) {
 
-	# here is where the switch to a new i occurs
-	my.df <- data_frame(geoid = my.geoid,
-               quarter = my.quarter,
-               year = my.year, 
-               ams_res = my.ams_res, 
-               res_vac = my.res_vac,
-               vac_3_res = my.vac_3_res,
-               vac_3_6_res = my.vac_3_6_res,
-               vac_6_12_res = my.vac_6_12_res,
-               vac_12_24_res = my.vac_12_24_res,
-               vac_24_36_res = my.vac_24_36_res,
-               vac_36_res = my.vac_36_res)
+	my.vector <- as.character(national.data$Month.Year[i])
 
-	# build the filename using i
-	outfile <- gsub(" ","",paste("HUD/",ldf[[i]]$month[1],"-",ldf[[i]]$year[1],"_values",".csv"))
+	if (national.data$totalAllRES_VAC[i] != 0) {
+		my.vector <- c(my.vector,
+			(national.data$totalAllVAC_3_RES[i] / national.data$totalAllRES_VAC[i]),
+			(national.data$totalAllVAC_3_6_R[i] / national.data$totalAllRES_VAC[i]),
+			(national.data$totalAllVAC_6_12R[i] / national.data$totalAllRES_VAC[i]),
+			(national.data$totalAllVAC_12_24R[i] / national.data$totalAllRES_VAC[i]),
+			(national.data$totalAllVAC_24_36R[i] / national.data$totalAllRES_VAC[i]),
+			(national.data$totalAllVAC_36_RES[i] / national.data$totalAllRES_VAC[i]),
+			# using a constant!!!!!
+			(sum(national.data$totalAllAVG_VAC_R[i])/NUMTRACTS),
+			(national.data$totalAllRES_VAC[i] / national.data$totalAllAMS_RES[i]),
+			(national.data$totalAllAMS_RES[i]))
 
-	# write the file out
-	print("Writing output csv file VALUES")
-	write.csv(my.df, outfile)
-	print("File is complete")
-
-	# reset my.df
-	my.df <- NULL
-  
-	# recreate empty my.df
-	my.df <- data.frame(matrix(ncol = 11, nrow = 0))
-
-	colnames(my.df) <- c("geoid",
-               	     "quarter",
-                       "year",
-                       "ams_res",
-                       "res_vac",
-                       "vac_3_res",
-                       "vac_3_6_res",
-                       "vac_6_12_res",
-                       "vac_12_24_res",
-                       "vac_24_36_res",
-                       "vac_36_res")
-
-	# reset the vectors
-	my.geoid <- as.character()
-	my.quarter <- as.character()
-	my.year <- as.character()
-	my.ams_res <- as.integer()
-	my.res_vac <- as.integer()
-	my.vac_3_res <- as.integer()
-	my.vac_3_6_res <- as.integer()
-	my.vac_6_12_res <- as.integer()
-	my.vac_12_24_res <- as.integer()
-	my.vac_24_36_res <- as.integer()
-	my.vac_36_res <- as.integer()
+	} else {
+		my.vector <- c(my.vector,0,0,0,0,0,0,
+			sum(national.data$totalAllAVG_VAC_R[i])/73767,0,0)	
+	}	
+	my.df[i,] <- my.vector
+	my.vector = list()
 
 }
 
-# remove ldf from memory
-rm("ldf")
+head(my.df)
 
 # ##################################################################
-# list all "values" files
+# plot the national level file
 # ##################################################################
 
-valuefiles <- list.files("HUD",pattern="*_values.csv",full.names=TRUE)
+trace1 <- list(
+  x = as.numeric(my.df$VAC_3_RESpc)*100, 
+  y = my.df$Month.Year, 
+  marker = list(color = "rgb(17, 78, 166)"), 
+  name = "0-3 mo", 
+  orientation = "h", 
+  type = "bar", 
+  uid = "063b98", 
+  xsrc = "Dreamshot:4231:b631ec", 
+  ysrc = "Dreamshot:4231:b4bc0c"
+)
+trace2 <- list(
+  x = as.numeric(my.df$VAC_3_6_RESpc)*100,
+  y = my.df$Month.Year, 
+  marker = list(color = "rgb(41, 128, 171)"), 
+  name = "3-6 mo", 
+  orientation = "h", 
+  type = "bar", 
+  uid = "d2ea67", 
+  xsrc = "Dreamshot:4231:9a1926", 
+  ysrc = "Dreamshot:4231:b4bc0c"
+)
+trace3 <- list(
+  x = as.numeric(my.df$VAC_6_12_RESpc)*100, 
+  y = my.df$Month.Year, 
+  marker = list(color = "rgb(104, 157, 46)"), 
+  name = "6-12 mo", 
+  orientation = "h", 
+  type = "bar", 
+  uid = "5e63a2", 
+  xsrc = "Dreamshot:4231:2ec534", 
+  ysrc = "Dreamshot:4231:b4bc0c"
+)
+trace4 <- list(
+  x = as.numeric(my.df$VAC_12_24_RESpc)*100, 
+  y = my.df$Month.Year, 
+  marker = list(color = "rgb(36, 118, 23)"), 
+  name = "12-24 mo", 
+  orientation = "h", 
+  type = "bar", 
+  uid = "24f079", 
+  xsrc = "Dreamshot:4231:c7663a", 
+  ysrc = "Dreamshot:4231:b4bc0c"
+)
+trace5 <- list(
+  x = as.numeric(my.df$VAC_24_36_RESpc)*100, 
+  y = my.df$Month.Year, 
+  marker = list(color = "rgb(169, 140, 31)"), 
+  name = "24-36 mo", 
+  orientation = "h", 
+  type = "bar", 
+  uid = "ae6448", 
+  xsrc = "Dreamshot:4231:8f7c41", 
+  ysrc = "Dreamshot:4231:b4bc0c"
+)
+trace6 <- list(
+  x = as.numeric(my.df$VAC_36_RESpc)*100,
+  y = my.df$Month.Year, 
+  marker = list(color = "rgb(178, 81, 28)"), 
+  name = "36+ mo", 
+  orientation = "h", 
+  type = "bar", 
+  uid = "173fcb", 
+  xsrc = "Dreamshot:4231:a324f1", 
+  ysrc = "Dreamshot:4231:b4bc0c"
+)
 
-my.value.ldf = lapply(valuefiles, read.csv, as.is=FALSE)
+data <- list(trace1, trace2, trace3, trace4, trace5, trace6)
 
-# ##################################################################
-# tidy the value files - separate the geoid into state, county, tract
-# ##################################################################
-
-for (i in 1:length(my.value.ldf)) {
-
-# #####################
-# NOTE
-# ##################
-# IT WOULD BE BETTER TO DO THIS WHOLE PROCESS IN PYTHON
-# AND DO THE VISUALIZATION IN r AFTER THE DATA IS PROCESSED HERE
-#
-# NOTE THAT STATE MUST BE '10', COUNTY MUST BE '10010' AND TRACT IS FINE AS IS
-# FIGURE OUT A WAY TO GET THESE DONE
-#####################
-
-	print(paste("Now processing: ",i))
-	# separate won't work here - county fips must include the state; same with tracts
-	my.state <- as.character(my.value.ldf[[i]]$geoid)
-
-	my.state <- separate(my.value.ldf[[i]],geoid,sep=c(2),convert=FALSE)
-
-	my.temp.df <- separate(my.value.ldf[[i]],geoid, 
-		into = c("state", "county","tract"), 
-		sep = c(2,5),
-		convert = FALSE)
-	
-	# build the filename using i
-	outfile <- gsub(" ","",paste("HUD/",my.temp.df$quarter[i],"-",my.temp.df$year[i],"_tidy",".csv"))
-
-	# get rid of this column (NEED TO FIGURE OUT WHY IT IS BEING ADDED)
-	my.temp.df$X <- NULL
-
-	# write the file out
-	print("Writing output csv file TIDY")
-	write.csv(my.temp.df, outfile)
-	print("File is complete")
-
-}
-
-rm("my.value.ldf")
-
-# ##################################################################
-# list all "tidy" files
-# ##################################################################
-
-tidyfiles <- list.files("HUD",pattern="*_tidy.csv",full.names=TRUE)
-
-my.tidy.ldf = lapply(tidyfiles, read.csv, as.is=FALSE)
-
-# ##################################################################
-# process different aggregations of each data set and output to 
-# the appropriate file
-# ##################################################################
-
-# ##################################################################
-# create STATE aggregations
-# ##################################################################
-
-# create buckets for totals
-tot_ams_res = 0
-tot_res_vac = 0
-tot_vac_3_res = 0
-tot_vac_3_6_res = 0
-tot_vac_6_12_res = 0
-tot_vac_12_24_res = 0
-tot_vac_24_36_res = 0
-tot_vac_36_res = 0
-
-# create an empty data frame
-my.state.df = NULL
-
-# store off first state
-my.state <- my.tidy.ldf[[1]]$state[1]
-
-# for each of the input files
-for (i in 1:length(my.tidy.ldf)) {
-
-	# aggregate States
-	print(paste("Now processing States in file: ",i))
-
-	# get the number of states in current file
-	my.count <- length(levels(as.factor(my.tidy.ldf[[i]]$state)))
-
-	# aggregate statistics to state level
-	for (j in 1:length(my.tidy.ldf[[i]][,1])) {
-
-		if (my.tidy.ldf[[i]]$state[j] != my.state) {
-			# got a new state
-			# do new state things
-
-			# print out the current accumulators
-			print(paste("State: ",my.state))
-
-			print(tot_ams_res)
-			print(tot_res_vac)
-			print(tot_vac_3_res)
-			print(tot_vac_3_6_res)
-			print(tot_vac_6_12_res)
-			print(tot_vac_12_24_res)
-			print(tot_vac_24_36_res)
-			print(tot_vac_36_res)
-
-			# calculate the percentages
-			# THIS NEEDS TO BE A FUNCTION!!!!!!!
-			if (tot_ams_res != 0) {
-				vac_3_perc <- tot_vac_3_res / tot_ams_res
-				vac_3_6_perc <- tot_vac_3_6_res / tot_ams_res
-				vac_6_12_perc <- tot_vac_6_12_res / tot_ams_res
-				vac_12_24_perc <- tot_vac_12_24_res / tot_ams_res
-				vac_24_36_perc <- tot_vac_24_36_res / tot_ams_res
-				vac_36_perc <- tot_vac_36_res / tot_ams_res
-
-				# calculate occupied and vacant percentage
-				occupied_perc <- (tot_ams_res - tot_res_vac) / tot_ams_res
-				vacant_perc <- tot_res_vac / tot_ams_res
-			} else {
-				vac_3_perc = 0
-				vac_3_6_perc = 0
-				vac_6_12_perc = 0
-				vac_12_24_perc = 0
-				vac_24_36_perc = 0
-				vac_36_perc = 0
-				occupied_perc = 0
-				vacant_perc = 0
-			}
-
-			# print the percentages
-			print(vac_3_perc)
-			print(vac_3_6_perc)
-			print(vac_6_12_perc)
-			print(vac_12_24_perc)
-			print(vac_24_36_perc)
-			print(vac_36_perc)
-			print(occupied_perc)
-			print(vacant_perc)
-			
-			# create a vector of the values to keep
-			my.state.vec <- c(state=my.state,
-		            quarter=my.quarter,
-		            year=my.year, 
-				vac_3_perc=vac_3_perc,
-				vac_3_6_perc=vac_3_6_perc,
-				vac_6_12_perc=vac_6_12_perc,
-				vac_12_24_perc=vac_12_24_perc,
-				vac_24_36_perc=vac_24_36_perc,
-				vac_36_perc=vac_36_perc,
-				occupied_perc=occupied_perc,
-				tot_ams_res=tot_ams_res,
-				vacant_perc=vacant_perc)
-
-			# add my.state.vec to my.state.df
-			my.state.df <- rbind(my.state.df,my.state.vec)
-
-			# reset my.state.vec to empty
-			my.state.vec <- NULL
-
-			# reset the accumulators
-			tot_ams_res = 0
-			tot_res_vac = 0
-			tot_vac_3_res = 0
-			tot_vac_3_6_res = 
-			tot_vac_6_12_res = 0
-			tot_vac_12_24_res = 0
-			tot_vac_24_36_res = 0
-			tot_vac_36_res = 0
-		}
-		# not a new state, so accumulate the values
-		tot_ams_res <- tot_ams_res + my.tidy.ldf[[i]]$ams_res[j]
-		tot_res_vac <- tot_res_vac + my.tidy.ldf[[i]]$res_vac[j]
-		tot_vac_3_res <- tot_vac_3_res + my.tidy.ldf[[i]]$vac_3_res[j]
-		tot_vac_3_6_res <- tot_vac_3_6_res + my.tidy.ldf[[i]]$vac_3_6_res[j]
-		tot_vac_6_12_res <- tot_vac_6_12_res + my.tidy.ldf[[i]]$vac_6_12_res[j]
-		tot_vac_12_24_res <- tot_vac_12_24_res + my.tidy.ldf[[i]]$vac_12_24_res[j]
-		tot_vac_24_36_res <- tot_vac_24_36_res + my.tidy.ldf[[i]]$vac_24_36_res[j]
-		tot_vac_36_res <- tot_vac_36_res + my.tidy.ldf[[i]]$vac_36_res[j]
-
-		# store the quarter and year
-		my.state <- as.character(my.tidy.ldf[[i]]$state[j])
-		my.quarter <- as.character(my.tidy.ldf[[i]]$quarter[j])
-		my.year <- as.character(my.tidy.ldf[[i]]$year[j])
-	
-	}
-
-}
-
-# build the filename 
-outfile <- gsub(" ","",paste("HUD/","all_states",".csv"))
-
-# write the file out
-print("Writing output csv file STATES")
-write.csv(my.state.df, outfile)
-#write.csv(mydata, file=outstate, append=T, col.names=F) 	# or outcounty or outtract
-print("File is complete")
-
-# ##################################################################
-# create COUNTY aggregations
-# ##################################################################
-
-# create buckets for totals
-tot_ams_res = 0
-tot_res_vac = 0
-tot_vac_3_res = 0
-tot_vac_3_6_res = 0
-tot_vac_6_12_res = 0
-tot_vac_12_24_res = 0
-tot_vac_24_36_res = 0
-tot_vac_36_res = 0
-
-# create an empty data frame
-my.county.df = NULL
-
-# store off first county
-my.county <- as.character(my.tidy.ldf[[1]]$county[1])
-
-# for each of the input files
-for (i in 1:length(my.tidy.ldf)) {
-
-	# aggregate Counties
-	print(paste("Now processing Counties in file: ",i))
-
-	# get the number of states in current file
-	my.count <- length(levels(as.factor(my.tidy.ldf[[i]]$county)))
-
-	# aggregate statistics to county level
-	for (j in 1:length(my.tidy.ldf[[i]][,1])) {
-
-		if (my.tidy.ldf[[i]]$county[j] != my.county) {
-			# got a new county
-			# do new county things
-
-			# print out the current accumulators
-			print(paste("County: ",my.county))
-
-			print(tot_ams_res)
-			print(tot_res_vac)
-			print(tot_vac_3_res)
-			print(tot_vac_3_6_res)
-			print(tot_vac_6_12_res)
-			print(tot_vac_12_24_res)
-			print(tot_vac_24_36_res)
-			print(tot_vac_36_res)
-
-			# calculate the percentages
-			# THIS NEEDS TO BE A FUNCTION!!!!!!!
-			if (tot_ams_res != 0) {
-				vac_3_perc <- tot_vac_3_res / tot_ams_res
-				vac_3_6_perc <- tot_vac_3_6_res / tot_ams_res
-				vac_6_12_perc <- tot_vac_6_12_res / tot_ams_res
-				vac_12_24_perc <- tot_vac_12_24_res / tot_ams_res
-				vac_24_36_perc <- tot_vac_24_36_res / tot_ams_res
-				vac_36_perc <- tot_vac_36_res / tot_ams_res
-
-				# calculate occupied and vacant percentage
-				occupied_perc <- (tot_ams_res - tot_res_vac) / tot_ams_res
-				vacant_perc <- tot_res_vac / tot_ams_res
-			} else {
-				vac_3_perc = 0
-				vac_3_6_perc = 0
-				vac_6_12_perc = 0
-				vac_12_24_perc = 0
-				vac_24_36_perc = 0
-				vac_36_perc = 0
-				occupied_perc = 0
-				vacant_perc = 0
-			}
-
-			# print the percentages
-			print(vac_3_perc)
-			print(vac_3_6_perc)
-			print(vac_6_12_perc)
-			print(vac_12_24_perc)
-			print(vac_24_36_perc)
-			print(vac_36_perc)
-			print(occupied_perc)
-			print(vacant_perc)
-			
-			# create a vector of the values to keep
-			my.county.vec <- c(county=my.county,
-		            quarter=my.quarter,
-		            year=my.year, 
-				vac_3_perc=vac_3_perc,
-				vac_3_6_perc=vac_3_6_perc,
-				vac_6_12_perc=vac_6_12_perc,
-				vac_12_24_perc=vac_12_24_perc,
-				vac_24_36_perc=vac_24_36_perc,
-				vac_36_perc=vac_36_perc,
-				occupied_perc=occupied_perc,
-				tot_ams_res=tot_ams_res,
-				vacant_perc=vacant_perc)
-
-			# add my.county.vec to my.county.df
-			my.county.df <- rbind(my.county.df,my.county.vec)
-
-			# reset my.county.vec to empty
-			my.county.vec <- NULL
-
-			# reset the accumulators
-			tot_ams_res = 0
-			tot_res_vac = 0
-			tot_vac_3_res = 0
-			tot_vac_3_6_res = 0
-			tot_vac_6_12_res = 0
-			tot_vac_12_24_res = 0
-			tot_vac_24_36_res = 0
-			tot_vac_36_res = 0
-		}
-		# not a new county, so accumulate the values
-		tot_ams_res <- tot_ams_res + my.tidy.ldf[[i]]$ams_res[j]
-		tot_res_vac <- tot_res_vac + my.tidy.ldf[[i]]$res_vac[j]
-		tot_vac_3_res <- tot_vac_3_res + my.tidy.ldf[[i]]$vac_3_res[j]
-		tot_vac_3_6_res <- tot_vac_3_6_res + my.tidy.ldf[[i]]$vac_3_6_res[j]
-		tot_vac_6_12_res <- tot_vac_6_12_res + my.tidy.ldf[[i]]$vac_6_12_res[j]
-		tot_vac_12_24_res <- tot_vac_12_24_res + my.tidy.ldf[[i]]$vac_12_24_res[j]
-		tot_vac_24_36_res <- tot_vac_24_36_res + my.tidy.ldf[[i]]$vac_24_36_res[j]
-		tot_vac_36_res <- tot_vac_36_res + my.tidy.ldf[[i]]$vac_36_res[j]
-
-		# store the quarter and year
-		my.county <- as.character(my.tidy.ldf[[i]]$county[j])
-		my.quarter <- as.character(my.tidy.ldf[[i]]$quarter[j])
-		my.year <- as.character(my.tidy.ldf[[i]]$year[j])
-	
-	}
-
-}
-
-# build the filename 
-outfile <- gsub(" ","",paste("HUD/","all_counties",".csv"))
-
-# write the file out
-print("Writing output csv file COUNTIES")
-write.csv(my.county.df, outfile)
-print("File is complete")
-
-
-
+layout <- list(
+  # changed autosize to TRUE here
+  autosize = TRUE, 
+  bargap = 0.05, 
+  bargroupgap = 0.15, 
+  barmode = "stack", 
+  boxgap = 0.3, 
+  boxgroupgap = 0.3, 
+  boxmode = "overlay", 
+  dragmode = "zoom", 
+  font = list(
+    color = "rgb(255, 255, 255)", 
+    family = "'Open sans', verdana, arial, sans-serif", 
+    size = 12
+  ), 
+  height = 700, 
+  hidesources = FALSE, 
+  hovermode = "x", 
+  legend = list(
+    x = 1.11153846154, 
+    y = 1.01538461538, 
+    bgcolor = "rgba(255, 255, 255, 0)", 
+    bordercolor = "rgba(0, 0, 0, 0)", 
+    borderwidth = 1, 
+    font = list(
+      color = "", 
+      family = "", 
+      size = 0
+    ), 
+    traceorder = "normal", 
+    xanchor = "auto", 
+    yanchor = "auto"
+  ), 
+  margin = list(
+    r = 80, 
+    t = 100, 
+    autoexpand = TRUE, 
+    b = 80, 
+    l = 100, 
+    pad = 0
+  ), 
+  paper_bgcolor = "rgb(67, 67, 67)", 
+  plot_bgcolor = "rgb(67, 67, 67)", 
+  separators = ".,", 
+  showlegend = TRUE, 
+  smith = FALSE, 
+  title = "National Level (United States)<br>Percent Units Vacant by Length of Time", 
+  titlefont = list(
+    color = "rgb(255, 255, 255)", 
+    family = "", 
+    size = 0
+  ), 
+  width = 700, 
+  xaxis = list(
+    anchor = "y", 
+    autorange = TRUE, 
+    autotick = TRUE, 
+    domain = c(0, 1), 
+    dtick = 20, 
+    exponentformat = "e", 
+    gridcolor = "#ddd", 
+    gridwidth = 1, 
+    linecolor = "#000", 
+    linewidth = 1, 
+    mirror = FALSE, 
+    nticks = 0, 
+    overlaying = FALSE, 
+    position = 0, 
+    range = c(0, 105.368421053), 
+    rangemode = "normal", 
+    showexponent = "all", 
+    showgrid = FALSE, 
+    showline = FALSE, 
+    showticklabels = TRUE, 
+    tick0 = 0, 
+    tickangle = "auto", 
+    tickcolor = "#000", 
+    tickfont = list(
+      color = "", 
+      family = "", 
+      size = 0
+    ), 
+    ticklen = 5, 
+    ticks = "", 
+    tickwidth = 1, 
+    title = "<br><i>Data Source: Housing & Urban Development</i>", 
+    titlefont = list(
+      color = "", 
+      family = "", 
+      size = 0
+    ), 
+    type = "linear", 
+    zeroline = FALSE, 
+    zerolinecolor = "#000", 
+    zerolinewidth = 1
+  ), 
+  yaxis = list(
+    anchor = "x", 
+    autorange = TRUE, 
+    autotick = TRUE, 
+    # added this so that the order is preserved on the output
+    categoryorder = "trace",
+    domain = c(0, 1), 
+    dtick = 1, 
+    exponentformat = "e", 
+    gridcolor = "#ddd", 
+    gridwidth = 1, 
+    linecolor = "#000", 
+    linewidth = 1, 
+    mirror = FALSE, 
+    nticks = 0, 
+    overlaying = FALSE, 
+    position = 0, 
+    range = c(-0.5, 23.5), 
+    rangemode = "normal", 
+    showexponent = "all", 
+    showgrid = FALSE, 
+    showline = FALSE, 
+    showticklabels = TRUE, 
+    tick0 = 0, 
+    tickangle = "auto", 
+    tickcolor = "#000", 
+    tickfont = list(
+      color = "", 
+      family = "", 
+      size = 0
+    ), 
+    ticklen = 5, 
+    ticks = "", 
+    tickwidth = 1, 
+    title = "", 
+    titlefont = list(
+      color = "", 
+      family = "", 
+      size = 0
+    ), 
+    type = "category", 
+    zeroline = FALSE, 
+    zerolinecolor = "#000", 
+    zerolinewidth = 1
+  )
+)
+p <- plot_ly(width=layout$width,height=layout$height)
+p <- add_trace(p, x=trace1$x, y=trace1$y, marker=trace1$marker, name=trace1$name, orientation=trace1$orientation, type=trace1$type, uid=trace1$uid, xsrc=trace1$xsrc, ysrc=trace1$ysrc)
+p <- add_trace(p, x=trace2$x, y=trace2$y, marker=trace2$marker, name=trace2$name, orientation=trace2$orientation, type=trace2$type, uid=trace2$uid, xsrc=trace2$xsrc, ysrc=trace2$ysrc)
+p <- add_trace(p, x=trace3$x, y=trace3$y, marker=trace3$marker, name=trace3$name, orientation=trace3$orientation, type=trace3$type, uid=trace3$uid, xsrc=trace3$xsrc, ysrc=trace3$ysrc)
+p <- add_trace(p, x=trace4$x, y=trace4$y, marker=trace4$marker, name=trace4$name, orientation=trace4$orientation, type=trace4$type, uid=trace4$uid, xsrc=trace4$xsrc, ysrc=trace4$ysrc)
+p <- add_trace(p, x=trace5$x, y=trace5$y, marker=trace5$marker, name=trace5$name, orientation=trace5$orientation, type=trace5$type, uid=trace5$uid, xsrc=trace5$xsrc, ysrc=trace5$ysrc)
+p <- add_trace(p, x=trace6$x, y=trace6$y, marker=trace6$marker, name=trace6$name, orientation=trace6$orientation, type=trace6$type, uid=trace6$uid, xsrc=trace6$xsrc, ysrc=trace6$ysrc)
+#p <- add_trace(p, x=trace7$x, y=trace7$y, marker=trace7$marker, name=trace7$name, orientation=trace7$orientation, type=trace7$type, uid=trace7$uid, xsrc=trace7$xsrc, ysrc=trace7$ysrc)
+# removed 'bargroupgap', 'boxgap', 'boxgroupgap', 'boxmode' (deprecated?)
+p <- layout(p, autosize=layout$autosize, bargap=layout$bargap, barmode=layout$barmode, dragmode=layout$dragmode, font=layout$font, hidesources=layout$hidesources, hovermode=layout$hovermode, legend=layout$legend, margin=layout$margin, paper_bgcolor=layout$paper_bgcolor, plot_bgcolor=layout$plot_bgcolor, separators=layout$separators, showlegend=layout$showlegend, smith=layout$smith, title=layout$title, titlefont=layout$titlefont, xaxis=layout$xaxis, yaxis=layout$yaxis)
+p
