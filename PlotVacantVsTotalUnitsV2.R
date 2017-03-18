@@ -5,7 +5,7 @@
 #
 # Email:  dolores.j.forbes@census.gov
 #
-# File: PlotVacantVsTotalUnits.R Version 2
+# File: PlotVacantVsTotalUnitsV2.R Version 2
 #
 # Branch:  Geographic Research & Innovation Staff/Geography
 #
@@ -14,7 +14,7 @@
 # Using R version 3.2.2 (2015-08-14) -- "Fire Safety"
 #
 # This file reads summary files generated from a Python script:
-# 	ProcessHUDfilesForVizWithFn.py
+# 	ProcessHUDfilesForVizWithFnV2.py
 #
 # The summary files consist of residential vacancy statistics
 # at multiple scales:  national, state, county, and census tract.
@@ -76,14 +76,14 @@ if(!getwd() == "C:/CensusProjs/HUDData/VacantHouses") {
 # process the national level file
 # ##################################################################
 
-national.data <- read.csv(file="./HUD/mynational.csv", 
+national.data <- read.csv(file="./HUD/national.csv", 
 	header=TRUE, 
 	sep=",")
 
 # create empty list
 my.vector = list()
 
-# create empty my.df
+# create empty data frame
 my.df <- data.frame(matrix(ncol = ncol(national.data)-1, 
 	nrow = nrow(national.data)))
 
@@ -110,16 +110,22 @@ for (i in 1:nrow(national.data)) {
 			(national.data$totalAllVAC_12_24R[i] / national.data$totalAllRES_VAC[i]),
 			(national.data$totalAllVAC_24_36R[i] / national.data$totalAllRES_VAC[i]),
 			(national.data$totalAllVAC_36_RES[i] / national.data$totalAllRES_VAC[i]),
+			(national.data$totalAllAVG_VAC_R[i]),            # calculated in Python
 			# using a constant!!!!!
-			(sum(national.data$totalAllAVG_VAC_R[i])/NUMTRACTS),
+			# (sum(national.data$totalAllAVG_VAC_R[i])/NUMTRACTS),
 			(national.data$totalAllRES_VAC[i] / national.data$totalAllAMS_RES[i]),
 			(national.data$totalAllAMS_RES[i]))
 
 	} else {
 		my.vector <- c(my.vector,0,0,0,0,0,0,
-			sum(national.data$totalAllAVG_VAC_R[i])/73767,0,0)	
+			#sum(national.data$totalAllAVG_VAC_R[i])/73767,0,0)	
+			national.data$totalAllAVG_VAC_R[i],0,0)
 	}	
+	
+	# append to the data frame
 	my.df[i,] <- my.vector
+	
+	# reset the vector to empty
 	my.vector = list()
 
 }
