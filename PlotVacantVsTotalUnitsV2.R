@@ -1,360 +1,514 @@
-# ##################################################################
-# Author:  Dolores Jane Forbes
+# ####################################################################
 #
-# Date:  03/10/2017
+# Program:  ProcessHUDfilesForVizWithFnV3.py
 #
-# Email:  dolores.j.forbes@census.gov
+# Author:  Dolores Jane Forbes (dolores.j.forbes@census.gov)  x39323
 #
-# File: PlotVacantVsTotalUnitsV2.R Version 2
+# Date:  March 19, 2017
+#
+# Python Version:  2.7.1
 #
 # Branch:  Geographic Research & Innovation Staff/Geography
 #
-# ##################################################################
+# This script processes census tract-level HUD input files by creating
+# summary statistics of individual variables at multiple spatial scales
+# (nation, state, county).  Census tract level is already included in the
+# files.
 #
-# Using R version 3.2.2 (2015-08-14) -- "Fire Safety"
+# The purpose in doing this is to develop visualizations of these
+# statistics over time at multiple spatial scales (national, state,
+# county, and the original census tract level).
 #
-# This file reads summary files generated from a Python script:
-# 	ProcessHUDfilesForVizWithFnV2.py
+# These multiple spatial scales might then be served for analysis
+# using R Shiny or other methods.
 #
-# The summary files consist of residential vacancy statistics
-# at multiple scales:  national, state, county, and census tract.
+# This script was built with Python 2.7
 #
-# This script opens and reads each of these files, and generates
-# tables of statistics based on percentages.  Each of the scales
-# is then visualized as a time series of percentage statistics.
+# I'm using Anaconda for Python 2.7 for easy access to the rich number of
+# available packages.
 #
-# ##################################################################
+#   - use conda env list    # to list available environments
+#   - activate py27         # activate py27
+#   - idle                  # to start IDLE as the programming environment
+#   - conda install pkg     # install a package (make sure py27 is activated)
 #
-# Modules:
-# 
-# 1)  Checks/sets the working directory
-# 2)  Opens each of the separate scale summary files:
-#		national.csv
-#		state.csv
-#		county.csv
-#		tract.csv
-#
-# ##################################################################
+# ####################################################################
+# import libraries
+# ####################################################################
+
+import os
+from glob import glob
+import pandas as pd
+import pysal as ps      # for reading .dbf files
+import csv              # for writing .csv files
+
+# ####################################################################
+# set working environment (or current working directory)
+# ####################################################################
 
 
-# ##################################################################
-# load libraries
-# ##################################################################
+# ####################################################################
+# global constants
+# ####################################################################
 
-library(foreign)
-library(plotly)
 
-# ##################################################################
-# environment settings
-# ##################################################################
+# ####################################################################
+# functions
+# ####################################################################
 
-options(scipen=999)
+'''
+This function: reads in DBF files and returns a Pandas data frame
 
-# ##################################################################
-# constants
-# ##################################################################
+Arguments
+---------
+dbfile  : DBF file - Input to be imported
+mycols  : list - List of columns to keep
+'''
 
-NUMTRACTS = 73767
+def dbf2DF(dbfile, mycols):
+    # Pysal to open DBF file
+    db = ps.open(dbfile)
+    # convert to a dictionary with key:value pairs
+    d = dict([(var, db.by_col(var)) for var in mycols])
+    # Convert to Pandas DF
+    pandasDF = pd.DataFrame(d)
+    # Make columns all uppercase
+    pandasDF.columns = map(str.upper, pandasDF.columns)
+    # close the dbf file
+    db.close()
+    # return the pandas data frame
+    return pandasDF
 
-# ##################################################################
-# check to see if working directory has already been set
-# ##################################################################
 
-# version for on site work
-#if(!getwd() == "T:/$$JSL/Janie/Private/VacantHouses") {
-#	oldwd = getwd()
-#	setwd("T:/$$JSL/Janie/Private/VacantHouses")
-#}
+# ####################################################################
+# main()
+# ####################################################################
 
-# version for telework site (home)
-if(!getwd() == "C:/CensusProjs/HUDData/VacantHouses") {
-	oldwd = getwd()
-	setwd("C:/CensusProjs/HUDData/VacantHouses")
-}
+# initialize some variables
+numAllRecords = 0
+numNationalRecords = 0
+numStateRecords = 0
+numCountyRecords = 0
+numTractRecords = 0
 
-# ##################################################################
-# process the national level file
-# ##################################################################
+# counters for calculating the Average Days Vacant statistic
+numRecsThisState = 0
+numRecsThisCounty = 0
+numRecsThisFile = 0
 
-national.data <- read.csv(file="./HUD/national.csv", 
-	header=TRUE, 
-	sep=",")
+# lists of columns I want to keep
+colsListuc = ["GEOID",
+            "month",
+            "year",
+            "AMS_RES",
+            "RES_VAC",
+            "AVG_VAC_R",
+            "VAC_3_RES",
+            "VAC_3_6_R",
+            "VAC_6_12R",
+            "VAC_12_24R",
+            "VAC_24_36R",
+            "VAC_36_RES"]
 
-# create empty list
-my.vector = list()
+colsListlc = ["GEOID",
+            "month",
+            "year",
+            "ams_res",
+            "res_vac",
+            "avg_vac_r",
+            "vac_3_res",
+            "vac_3_6_r",
+            "vac_6_12r",
+            "vac_12_24r",
+            "vac_24_36r",
+            "vac_36_res"]    
 
-# create empty data frame
-my.df <- data.frame(matrix(ncol = ncol(national.data)-1, 
-	nrow = nrow(national.data)))
+# national level sums
+totalAllAMS_RES = 0
+totalAllRES_VAC = 0
+totalAllAVG_VAC_R = 0
+totalAllVAC_3_RES = 0
+totalAllVAC_3_6_R = 0
+totalAllVAC_6_12R = 0
+totalAllVAC_12_24R = 0
+totalAllVAC_24_36R = 0
+totalAllVAC_36_RES = 0
 
-colnames(my.df) <- c("Month.Year",
-			"VAC_3_RESpc",
-			"VAC_3_6_RESpc",
-			"VAC_6_12_RESpc",
-			"VAC_12_24_RESpc",
-			"VAC_24_36_RESpc",
-			"VAC_36_RESpc",
-			"AVG_DAYS_VAC",
-			"RES_VACpc",
-			"AMS_RES")
+# state level sums
+totalStateAMS_RES = 0
+totalStateRES_VAC = 0
+totalStateAVG_VAC_R = 0
+totalStateVAC_3_RES = 0
+totalStateVAC_3_6_R = 0
+totalStateVAC_6_12R = 0
+totalStateVAC_12_24R = 0
+totalStateVAC_24_36R = 0
+totalStateVAC_36_RES = 0
 
-for (i in 1:nrow(national.data)) {
+# county level sums
+totalCountyAMS_RES = 0
+totalCountyRES_VAC = 0
+totalCountyAVG_VAC_R = 0
+totalCountyVAC_3_RES = 0
+totalCountyVAC_3_6_R = 0
+totalCountyVAC_6_12R = 0
+totalCountyVAC_12_24R = 0
+totalCountyVAC_24_36R = 0
+totalCountyVAC_36_RES = 0
 
-	my.vector <- as.character(national.data$Month.Year[i])
+# open four files for output and write the headers
+# one for each scale:  national, state, county, tract
+# Note:  record layouts are the same, variable names differ by scale
 
-	if (national.data$totalAllRES_VAC[i] != 0) {
-		my.vector <- c(my.vector,
-			(national.data$totalAllVAC_3_RES[i] / national.data$totalAllRES_VAC[i]),
-			(national.data$totalAllVAC_3_6_R[i] / national.data$totalAllRES_VAC[i]),
-			(national.data$totalAllVAC_6_12R[i] / national.data$totalAllRES_VAC[i]),
-			(national.data$totalAllVAC_12_24R[i] / national.data$totalAllRES_VAC[i]),
-			(national.data$totalAllVAC_24_36R[i] / national.data$totalAllRES_VAC[i]),
-			(national.data$totalAllVAC_36_RES[i] / national.data$totalAllRES_VAC[i]),
-			(national.data$totalAllAVG_VAC_R[i]),            # calculated in Python
-			# using a constant!!!!!
-			# (sum(national.data$totalAllAVG_VAC_R[i])/NUMTRACTS),
-			(national.data$totalAllRES_VAC[i] / national.data$totalAllAMS_RES[i]),
-			(national.data$totalAllAMS_RES[i]))
+nationalFile = open('..\\HUD\\national.csv',"wb")
+natlWriter = csv.writer(nationalFile, delimiter=',',
+                              quotechar='"',quoting=csv.QUOTE_NONNUMERIC)
+natlWriter.writerow(['Month/Year',
+                    'GEOID',                # to keep record layouts consistent
+                    'totalAllAMS_RES',
+                    'totalAllRES_VAC',
+                    'totalAllAVG_VAC_R',
+                    'totalAllVAC_3_RES',
+                    'totalAllVAC_3_6_R',
+                    'totalAllVAC_6_12R',
+                    'totalAllVAC_12_24R',
+                    'totalAllVAC_24_36R',
+                    'totalAllVAC_36_RES'])
 
-	} else {
-		my.vector <- c(my.vector,0,0,0,0,0,0,
-			#sum(national.data$totalAllAVG_VAC_R[i])/73767,0,0)	
-			national.data$totalAllAVG_VAC_R[i],0,0)
-	}	
-	
-	# append to the data frame
-	my.df[i,] <- my.vector
-	
-	# reset the vector to empty
-	my.vector = list()
+stateFile = open('..\\HUD\\state.csv',"wb")
+stateWriter = csv.writer(stateFile, delimiter=',',
+                              quotechar='"',quoting=csv.QUOTE_NONNUMERIC)
+stateWriter.writerow(['Month/Year',
+                    'GEOID',
+                    'totalStateAMS_RES',
+                    'totalStateRES_VAC',
+                    'totalStateAVG_VAC_R',
+                    'totalStateVAC_3_RES',
+                    'totalStateVAC_3_6_R',
+                    'totalStateVAC_6_12R',
+                    'totalStateVAC_12_24R',
+                    'totalStateVAC_24_36R',
+                    'totalStateVAC_36_RES'])
 
-}
+countyFile = open('..\\HUD\\county.csv',"wb")
+countyWriter = csv.writer(countyFile, delimiter=',',
+                              quotechar='"',quoting=csv.QUOTE_NONNUMERIC)
+countyWriter.writerow(['Month/Year',
+                    'GEOID',
+                    'totalCountyAMS_RES',
+                    'totalCountyRES_VAC',
+                    'totalCountyAVG_VAC_R',
+                    'totalCountyVAC_3_RES',
+                    'totalCountyVAC_3_6_R',
+                    'totalCountyVAC_6_12R',
+                    'totalCountyVAC_12_24R',
+                    'totalCountyVAC_24_36R',
+                    'totalCountyVAC_36_RES'])
 
-head(my.df)
+tractFile = open('..\\HUD\\tract.csv',"wb")
+tractWriter = csv.writer(tractFile, delimiter=',',
+                              quotechar='"',quoting=csv.QUOTE_NONNUMERIC)
+tractWriter.writerow(['Month/Year',
+                    'GEOID',
+                    'tractAMS_RES',
+                    'tractRES_VAC',
+                    'tractAVG_VAC_R',
+                    'tractVAC_3_RES',
+                    'tractVAC_3_6_R',
+                    'tractVAC_6_12R',
+                    'tractVAC_12_24R',
+                    'tractVAC_24_36R',
+                    'tractVAC_36_RES'])
 
-# ##################################################################
-# plot the national level file
-# ##################################################################
+# get list of all .dbf filenames in the specific directory
+fileNames = glob('..\\Shapefiles\\*.dbf')
+print(fileNames)
 
-trace1 <- list(
-  x = as.numeric(my.df$VAC_3_RESpc)*100, 
-  y = my.df$Month.Year, 
-  marker = list(color = "rgb(17, 78, 166)"), 
-  name = "0-3 mo", 
-  orientation = "h", 
-  type = "bar", 
-  uid = "063b98", 
-  xsrc = "Dreamshot:4231:b631ec", 
-  ysrc = "Dreamshot:4231:b4bc0c"
-)
-trace2 <- list(
-  x = as.numeric(my.df$VAC_3_6_RESpc)*100,
-  y = my.df$Month.Year, 
-  marker = list(color = "rgb(41, 128, 171)"), 
-  name = "3-6 mo", 
-  orientation = "h", 
-  type = "bar", 
-  uid = "d2ea67", 
-  xsrc = "Dreamshot:4231:9a1926", 
-  ysrc = "Dreamshot:4231:b4bc0c"
-)
-trace3 <- list(
-  x = as.numeric(my.df$VAC_6_12_RESpc)*100, 
-  y = my.df$Month.Year, 
-  marker = list(color = "rgb(104, 157, 46)"), 
-  name = "6-12 mo", 
-  orientation = "h", 
-  type = "bar", 
-  uid = "5e63a2", 
-  xsrc = "Dreamshot:4231:2ec534", 
-  ysrc = "Dreamshot:4231:b4bc0c"
-)
-trace4 <- list(
-  x = as.numeric(my.df$VAC_12_24_RESpc)*100, 
-  y = my.df$Month.Year, 
-  marker = list(color = "rgb(36, 118, 23)"), 
-  name = "12-24 mo", 
-  orientation = "h", 
-  type = "bar", 
-  uid = "24f079", 
-  xsrc = "Dreamshot:4231:c7663a", 
-  ysrc = "Dreamshot:4231:b4bc0c"
-)
-trace5 <- list(
-  x = as.numeric(my.df$VAC_24_36_RESpc)*100, 
-  y = my.df$Month.Year, 
-  marker = list(color = "rgb(169, 140, 31)"), 
-  name = "24-36 mo", 
-  orientation = "h", 
-  type = "bar", 
-  uid = "ae6448", 
-  xsrc = "Dreamshot:4231:8f7c41", 
-  ysrc = "Dreamshot:4231:b4bc0c"
-)
-trace6 <- list(
-  x = as.numeric(my.df$VAC_36_RESpc)*100,
-  y = my.df$Month.Year, 
-  marker = list(color = "rgb(178, 81, 28)"), 
-  name = "36+ mo", 
-  orientation = "h", 
-  type = "bar", 
-  uid = "173fcb", 
-  xsrc = "Dreamshot:4231:a324f1", 
-  ysrc = "Dreamshot:4231:b4bc0c"
-)
+# process each file
+for myFile in fileNames:
 
-data <- list(trace1, trace2, trace3, trace4, trace5, trace6)
+    # First, check the year to see if we have lowercase column headings.
+    # Note that beginning in 3/2015, HUD column headings are NOT uppercase,
+    # make sure that all the headers are in uppercase to match colsList
 
-layout <- list(
-  # changed autosize to TRUE here
-  autosize = TRUE, 
-  bargap = 0.05, 
-  bargroupgap = 0.15, 
-  barmode = "stack", 
-  boxgap = 0.3, 
-  boxgroupgap = 0.3, 
-  boxmode = "overlay", 
-  dragmode = "zoom", 
-  font = list(
-    color = "rgb(255, 255, 255)", 
-    family = "'Open sans', verdana, arial, sans-serif", 
-    size = 12
-  ), 
-  height = 700, 
-  hidesources = FALSE, 
-  hovermode = "x", 
-  legend = list(
-    x = 1.11153846154, 
-    y = 1.01538461538, 
-    bgcolor = "rgba(255, 255, 255, 0)", 
-    bordercolor = "rgba(0, 0, 0, 0)", 
-    borderwidth = 1, 
-    font = list(
-      color = "", 
-      family = "", 
-      size = 0
-    ), 
-    traceorder = "normal", 
-    xanchor = "auto", 
-    yanchor = "auto"
-  ), 
-  margin = list(
-    r = 80, 
-    t = 100, 
-    autoexpand = TRUE, 
-    b = 80, 
-    l = 100, 
-    pad = 0
-  ), 
-  paper_bgcolor = "rgb(67, 67, 67)", 
-  plot_bgcolor = "rgb(67, 67, 67)", 
-  separators = ".,", 
-  showlegend = TRUE, 
-  smith = FALSE, 
-  title = "National Level (United States)<br>Percent Units Vacant by Length of Time", 
-  titlefont = list(
-    color = "rgb(255, 255, 255)", 
-    family = "", 
-    size = 0
-  ), 
-  width = 700, 
-  xaxis = list(
-    anchor = "y", 
-    autorange = TRUE, 
-    autotick = TRUE, 
-    domain = c(0, 1), 
-    dtick = 20, 
-    exponentformat = "e", 
-    gridcolor = "#ddd", 
-    gridwidth = 1, 
-    linecolor = "#000", 
-    linewidth = 1, 
-    mirror = FALSE, 
-    nticks = 0, 
-    overlaying = FALSE, 
-    position = 0, 
-    range = c(0, 105.368421053), 
-    rangemode = "normal", 
-    showexponent = "all", 
-    showgrid = FALSE, 
-    showline = FALSE, 
-    showticklabels = TRUE, 
-    tick0 = 0, 
-    tickangle = "auto", 
-    tickcolor = "#000", 
-    tickfont = list(
-      color = "", 
-      family = "", 
-      size = 0
-    ), 
-    ticklen = 5, 
-    ticks = "", 
-    tickwidth = 1, 
-    title = "<br><i>Data Source: Housing & Urban Development</i>", 
-    titlefont = list(
-      color = "", 
-      family = "", 
-      size = 0
-    ), 
-    type = "linear", 
-    zeroline = FALSE, 
-    zerolinecolor = "#000", 
-    zerolinewidth = 1
-  ), 
-  yaxis = list(
-    anchor = "x", 
-    autorange = TRUE, 
-    autotick = TRUE, 
-    # added this so that the order is preserved on the output
-    categoryorder = "trace",
-    domain = c(0, 1), 
-    dtick = 1, 
-    exponentformat = "e", 
-    gridcolor = "#ddd", 
-    gridwidth = 1, 
-    linecolor = "#000", 
-    linewidth = 1, 
-    mirror = FALSE, 
-    nticks = 0, 
-    overlaying = FALSE, 
-    position = 0, 
-    range = c(-0.5, 23.5), 
-    rangemode = "normal", 
-    showexponent = "all", 
-    showgrid = FALSE, 
-    showline = FALSE, 
-    showticklabels = TRUE, 
-    tick0 = 0, 
-    tickangle = "auto", 
-    tickcolor = "#000", 
-    tickfont = list(
-      color = "", 
-      family = "", 
-      size = 0
-    ), 
-    ticklen = 5, 
-    ticks = "", 
-    tickwidth = 1, 
-    title = "", 
-    titlefont = list(
-      color = "", 
-      family = "", 
-      size = 0
-    ), 
-    type = "category", 
-    zeroline = FALSE, 
-    zerolinecolor = "#000", 
-    zerolinewidth = 1
-  )
-)
-p <- plot_ly(width=layout$width,height=layout$height)
-p <- add_trace(p, x=trace1$x, y=trace1$y, marker=trace1$marker, name=trace1$name, orientation=trace1$orientation, type=trace1$type, uid=trace1$uid, xsrc=trace1$xsrc, ysrc=trace1$ysrc)
-p <- add_trace(p, x=trace2$x, y=trace2$y, marker=trace2$marker, name=trace2$name, orientation=trace2$orientation, type=trace2$type, uid=trace2$uid, xsrc=trace2$xsrc, ysrc=trace2$ysrc)
-p <- add_trace(p, x=trace3$x, y=trace3$y, marker=trace3$marker, name=trace3$name, orientation=trace3$orientation, type=trace3$type, uid=trace3$uid, xsrc=trace3$xsrc, ysrc=trace3$ysrc)
-p <- add_trace(p, x=trace4$x, y=trace4$y, marker=trace4$marker, name=trace4$name, orientation=trace4$orientation, type=trace4$type, uid=trace4$uid, xsrc=trace4$xsrc, ysrc=trace4$ysrc)
-p <- add_trace(p, x=trace5$x, y=trace5$y, marker=trace5$marker, name=trace5$name, orientation=trace5$orientation, type=trace5$type, uid=trace5$uid, xsrc=trace5$xsrc, ysrc=trace5$ysrc)
-p <- add_trace(p, x=trace6$x, y=trace6$y, marker=trace6$marker, name=trace6$name, orientation=trace6$orientation, type=trace6$type, uid=trace6$uid, xsrc=trace6$xsrc, ysrc=trace6$ysrc)
-#p <- add_trace(p, x=trace7$x, y=trace7$y, marker=trace7$marker, name=trace7$name, orientation=trace7$orientation, type=trace7$type, uid=trace7$uid, xsrc=trace7$xsrc, ysrc=trace7$ysrc)
-# removed 'bargroupgap', 'boxgap', 'boxgroupgap', 'boxmode' (deprecated?)
-p <- layout(p, autosize=layout$autosize, bargap=layout$bargap, barmode=layout$barmode, dragmode=layout$dragmode, font=layout$font, hidesources=layout$hidesources, hovermode=layout$hovermode, legend=layout$legend, margin=layout$margin, paper_bgcolor=layout$paper_bgcolor, plot_bgcolor=layout$plot_bgcolor, separators=layout$separators, showlegend=layout$showlegend, smith=layout$smith, title=layout$title, titlefont=layout$titlefont, xaxis=layout$xaxis, yaxis=layout$yaxis)
-p
+    # I'm looking for the year at the end of the filename:
+    if int(myFile[-26:-22]) >= 2015:
+        colsList = colsListlc
+    else:
+        colsList = colsListuc
+
+    # open and convert the .dbf file to pandas data frame with my selected columns
+    mypandasDF = dbf2DF(myFile,colsList)
+
+    # What's the GEOID look like?
+    print("First GEOID in this file: %s" % (mypandasDF.iloc[0]['GEOID']))
+
+    # get current state GEOID
+    myState = str(mypandasDF.iloc[0]['GEOID'][0:2])
+    print("Initial State: %s" % (myState))
+    
+    # get current county GEOID
+    myCounty = str(mypandasDF.iloc[0]['GEOID'][0:5])
+    print("Initial County: %s" % (myCounty))
+
+    # get current month/year for this file
+    myQtrYear = str(mypandasDF.iloc[0]['MONTH']) + "/" + str(mypandasDF.iloc[0]['YEAR'])
+    print("Month/Year: %s" % (myQtrYear))
+
+    # process each record in the individual file
+    for index, row in mypandasDF.iterrows():
+        
+        # increment the counters
+        numAllRecords += 1
+        numTractRecords += 1
+
+        # export the record to the census tract file
+        tractWriter.writerow([myQtrYear,
+                              str(row['GEOID']),
+                              row['AMS_RES'],
+                              row['RES_VAC'],
+                              row['AVG_VAC_R'],
+                              row['VAC_3_RES'],
+                              row['VAC_3_6_R'],
+                              row['VAC_6_12R'],
+                              row['VAC_12_24R'],
+                              row['VAC_24_36R'],
+                              row['VAC_36_RES']])
+
+        # is this a new county?
+        if (myCounty <> str(row["GEOID"][0:5])):
+            
+            # yes, so calculate the Average Days Vacant for this county
+            totalCountyAVG_VAC_R = (totalCountyAVG_VAC_R / numRecsThisCounty)
+
+            # yes, so write a line to the county file for this quarter-year
+            countyWriter.writerow([myQtrYear,
+                                myCounty,
+                                totalCountyAMS_RES,
+                                totalCountyRES_VAC,
+                                totalCountyAVG_VAC_R,
+                                totalCountyVAC_3_RES,
+                                totalCountyVAC_3_6_R,
+                                totalCountyVAC_6_12R,
+                                totalCountyVAC_12_24R,
+                                totalCountyVAC_24_36R,
+                                totalCountyVAC_36_RES])
+
+            # number of county records output
+            numCountyRecords += 1
+            
+            # reset the county level totals
+            totalCountyAMS_RES = 0
+            totalCountyRES_VAC = 0
+            totalCountyAVG_VAC_R = 0
+            totalCountyVAC_3_RES = 0
+            totalCountyVAC_3_6_R = 0
+            totalCountyVAC_6_12R = 0
+            totalCountyVAC_12_24R = 0
+            totalCountyVAC_24_36R = 0
+            totalCountyVAC_36_RES = 0
+
+            # reset the county level counter
+            numRecsThisCounty = 0
+            
+        # is this a new state?
+        if (myState <> str(row["GEOID"][0:2])):
+            
+            # yes, so calculate the Average Days Vacant for this state
+            totalStateAVG_VAC_R = (totalStateAVG_VAC_R / numRecsThisState)
+
+            # yes, so write a line to the state file for this quarter-year
+            stateWriter.writerow([myQtrYear,
+                                myState,
+                                totalStateAMS_RES,
+                                totalStateRES_VAC,
+                                totalStateAVG_VAC_R,
+                                totalStateVAC_3_RES,
+                                totalStateVAC_3_6_R,
+                                totalStateVAC_6_12R,
+                                totalStateVAC_12_24R,
+                                totalStateVAC_24_36R,
+                                totalStateVAC_36_RES])
+
+            # count number of state records written
+            numStateRecords += 1
+
+            # reset the state level totals
+            totalStateAMS_RES = 0
+            totalStateRES_VAC = 0
+            totalStateAVG_VAC_R = 0
+            totalStateVAC_3_RES = 0
+            totalStateVAC_3_6_R = 0
+            totalStateVAC_6_12R = 0
+            totalStateVAC_12_24R = 0
+            totalStateVAC_24_36R = 0
+            totalStateVAC_36_RES = 0
+
+            # reset the record counts for this state
+            numRecsThisState = 0
+
+        # sum the national totals (all records within each quarter/year)
+        totalAllAMS_RES += row["AMS_RES"]
+        totalAllRES_VAC += row["RES_VAC"]
+        totalAllAVG_VAC_R += row["AVG_VAC_R"]
+        totalAllVAC_3_RES += row["VAC_3_RES"]
+        totalAllVAC_3_6_R += row["VAC_3_6_R"]
+        totalAllVAC_6_12R += row["VAC_6_12R"]
+        totalAllVAC_12_24R += row["VAC_12_24R"]
+        totalAllVAC_24_36R += row["VAC_24_36R"]
+        totalAllVAC_36_RES += row["VAC_36_RES"]
+
+        # increment the record counter for Average Days Vacant Statistic
+        numRecsThisFile += 1            # for national level
+
+        # sum the state totals (all records within a given state)
+        totalStateAMS_RES += row["AMS_RES"]
+        totalStateRES_VAC += row["RES_VAC"]
+        totalStateAVG_VAC_R += row["AVG_VAC_R"]
+        totalStateVAC_3_RES += row["VAC_3_RES"]
+        totalStateVAC_3_6_R += row["VAC_3_6_R"]
+        totalStateVAC_6_12R += row["VAC_6_12R"]
+        totalStateVAC_12_24R += row["VAC_12_24R"]
+        totalStateVAC_24_36R += row["VAC_24_36R"]
+        totalStateVAC_36_RES += row["VAC_36_RES"]
+
+        # increment the record counter for Average Days Vacant Statistic
+        numRecsThisState += 1
+
+        # sum the county totals (all records within a given county in a state)
+        totalCountyAMS_RES += row["AMS_RES"]
+        totalCountyRES_VAC += row["RES_VAC"]
+        totalCountyAVG_VAC_R += row["AVG_VAC_R"]
+        totalCountyVAC_3_RES += row["VAC_3_RES"]
+        totalCountyVAC_3_6_R += row["VAC_3_6_R"]
+        totalCountyVAC_6_12R += row["VAC_6_12R"]
+        totalCountyVAC_12_24R += row["VAC_12_24R"]
+        totalCountyVAC_24_36R += row["VAC_24_36R"]
+        totalCountyVAC_36_RES += row["VAC_36_RES"]
+
+        # increment the record counters for Average Days Vacant statistic
+        numRecsThisCounty += 1
+
+        # get ready for next row, store off the new State, County
+        myState = str(row["GEOID"][0:2])
+        
+        myCounty = str(row["GEOID"][0:5])
+
+    # end of all records within a file
+    print("The file %s has completed processing." % (myFile))
+
+    # calculate the Average Days Vacant for this file (national level)
+    totalAllAVG_VAC_R = (totalAllAVG_VAC_R / numRecsThisFile)
+    
+    # write a line to the national file for this quarter-year
+    natlWriter.writerow([myQtrYear,
+                        "01",               # an "invented" geoid for the USA
+                        totalAllAMS_RES,
+                        totalAllRES_VAC,
+                        totalAllAVG_VAC_R,
+                        totalAllVAC_3_RES,
+                        totalAllVAC_3_6_R,
+                        totalAllVAC_6_12R,
+                        totalAllVAC_12_24R,
+                        totalAllVAC_24_36R,
+                        totalAllVAC_36_RES])
+
+    # count number of national records processed
+    numNationalRecords += 1
+
+    # reset the national totals
+    totalAllAMS_RES = 0
+    totalAllRES_VAC = 0
+    totalAllAVG_VAC_R = 0
+    totalAllVAC_3_RES = 0
+    totalAllVAC_3_6_R = 0
+    totalAllVAC_6_12R = 0
+    totalAllVAC_12_24R = 0
+    totalAllVAC_24_36R = 0
+    totalAllVAC_36_RES = 0
+
+    # reset the number of records in this file
+    numRecsThisFile = 0
+
+    # calculate the Average Days Vacant for this state
+    totalStateAVG_VAC_R = (totalStateAVG_VAC_R / numRecsThisState)
+
+    # write a line to the state file for this quarter-year
+    stateWriter.writerow([myQtrYear,
+                        str(row["GEOID"][0:2]),
+                        totalStateAMS_RES,
+                        totalStateRES_VAC,
+                        totalStateAVG_VAC_R,
+                        totalStateVAC_3_RES,
+                        totalStateVAC_3_6_R,
+                        totalStateVAC_6_12R,
+                        totalStateVAC_12_24R,
+                        totalStateVAC_24_36R,
+                        totalStateVAC_36_RES])
+
+    # count number of state records processed
+    numStateRecords += 1
+
+    # reset the state level totals
+    totalStateAMS_RES = 0
+    totalStateRES_VAC = 0
+    totalStateAVG_VAC_R = 0
+    totalStateVAC_3_RES = 0
+    totalStateVAC_3_6_R = 0
+    totalStateVAC_6_12R = 0
+    totalStateVAC_12_24R = 0
+    totalStateVAC_24_36R = 0
+    totalStateVAC_36_RES = 0
+
+    # reset the record count for this state
+    numRecsThisState = 0
+
+    # calculate the Average Days Vacant for this county
+    totalCountyAVG_VAC_R = (totalCountyAVG_VAC_R / numRecsThisCounty)
+
+    # write the totals to the county aggregate file
+    countyWriter.writerow([myQtrYear,
+                        str(row["GEOID"][0:5]),
+                        totalCountyAMS_RES,
+                        totalCountyRES_VAC,
+                        totalCountyAVG_VAC_R,
+                        totalCountyVAC_3_RES,
+                        totalCountyVAC_3_6_R,
+                        totalCountyVAC_6_12R,
+                        totalCountyVAC_12_24R,
+                        totalCountyVAC_24_36R,
+                        totalCountyVAC_36_RES])
+
+    # count number of county records processed
+    numCountyRecords += 1
+    
+    # reset the county level totals
+    totalCountyAMS_RES = 0
+    totalCountyRES_VAC = 0
+    totalCountyAVG_VAC_R = 0
+    totalCountyVAC_3_RES = 0
+    totalCountyVAC_3_6_R = 0
+    totalCountyVAC_6_12R = 0
+    totalCountyVAC_12_24R = 0
+    totalCountyVAC_24_36R = 0
+    totalCountyVAC_36_RES = 0
+
+    # reset the record count for this county
+    numRecsThisCounty = 0
+
+# end of all input files
+print("Total number of records processed: %i" % (numAllRecords))
+print("Number of national records: %i" % (numNationalRecords))
+print("Number of state records: %i" % (numStateRecords))
+print("Number of county records: %i" % (numCountyRecords))
+print("Number of tract records: %i" % (numTractRecords))
+
+# close all files
+tractFile.close()
+countyFile.close()
+stateFile.close()
+nationalFile.close()
+
+
+    
+
