@@ -1,10 +1,10 @@
 # ####################################################################
 #
-# Program:  ProcessHUDfilesForVizWithFn.py
+# Program:  ProcessHUDfilesForVizWithFnV3.py
 #
 # Author:  Dolores Jane Forbes (dolores.j.forbes@census.gov)  x39323
 #
-# Date:  March 14, 2017
+# Date:  March 19, 2017
 #
 # Python Version:  2.7.1
 #
@@ -161,7 +161,8 @@ totalCountyVAC_36_RES = 0
 # Note:  record layouts are the same, variable names differ by scale
 
 nationalFile = open('..\\HUD\\national.csv',"wb")
-natlWriter = csv.writer(nationalFile, delimiter=',')
+natlWriter = csv.writer(nationalFile, delimiter=',',
+                              quotechar='"',quoting=csv.QUOTE_NONNUMERIC)
 natlWriter.writerow(['Month/Year',
                     'GEOID',                # to keep record layouts consistent
                     'totalAllAMS_RES',
@@ -175,7 +176,8 @@ natlWriter.writerow(['Month/Year',
                     'totalAllVAC_36_RES'])
 
 stateFile = open('..\\HUD\\state.csv',"wb")
-stateWriter = csv.writer(stateFile, delimiter=',')
+stateWriter = csv.writer(stateFile, delimiter=',',
+                              quotechar='"',quoting=csv.QUOTE_NONNUMERIC)
 stateWriter.writerow(['Month/Year',
                     'GEOID',
                     'totalStateAMS_RES',
@@ -189,7 +191,8 @@ stateWriter.writerow(['Month/Year',
                     'totalStateVAC_36_RES'])
 
 countyFile = open('..\\HUD\\county.csv',"wb")
-countyWriter = csv.writer(countyFile, delimiter=',')
+countyWriter = csv.writer(countyFile, delimiter=',',
+                              quotechar='"',quoting=csv.QUOTE_NONNUMERIC)
 countyWriter.writerow(['Month/Year',
                     'GEOID',
                     'totalCountyAMS_RES',
@@ -203,7 +206,8 @@ countyWriter.writerow(['Month/Year',
                     'totalCountyVAC_36_RES'])
 
 tractFile = open('..\\HUD\\tract.csv',"wb")
-tractWriter = csv.writer(tractFile, delimiter=',')
+tractWriter = csv.writer(tractFile, delimiter=',',
+                              quotechar='"',quoting=csv.QUOTE_NONNUMERIC)
 tractWriter.writerow(['Month/Year',
                     'GEOID',
                     'tractAMS_RES',
